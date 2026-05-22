@@ -3,7 +3,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/yourusername/vision-mcp)](https://goreportcard.com/report/github.com/yourusername/vision-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A high-performance, secure **Model Context Protocol (MCP)** server written in Go that empowers text-only Large Language Models (such as DeepSeek-V3, Qwen-2.5, or text-only Llama models) to "see" and analyze local image files by calling an external OpenAI or OpenAI-compatible Vision Model.
+A high-performance, secure **Model Context Protocol (MCP)** server written in Go that empowers text-only Large Language Models (such as DeepSeek-V4, GLM-5.1 or other text-only models) to "see" and analyze local image files by calling an external OpenAI or OpenAI-compatible Vision Model.
 
 ---
 
