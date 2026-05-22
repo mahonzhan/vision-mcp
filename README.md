@@ -66,7 +66,7 @@ The server is configured entirely using **environment variables**. They can be s
 
 ### OpenCode
 
-To use this server with OpenCode, add the server configuration to your OpenCode `config.json` file:
+To use this server with OpenCode, add the server configuration to your OpenCode `config.json` file or project dir `opencode.json`:
 
 ```json
 {
