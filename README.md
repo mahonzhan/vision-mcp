@@ -64,33 +64,6 @@ The server is configured entirely using **environment variables**. They can be s
 
 ## MCP Integration
 
-### Claude Desktop
-
-To use this server with the Claude Desktop client, add the server configuration to your `claude_desktop_config.json`:
-
-#### macOS
-`~/Library/Application Support/Claude/claude_desktop_config.json`
-
-#### Windows
-`%APPDATA%\Claude\claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "vision-mcp": {
-      "command": "/path/to/your/compiled/vision-mcp",
-      "env": {
-        "OPENAI_API_KEY": "your-actual-api-key-here",
-        "OPENAI_BASE_URL": "https://api.openai.com/v1",
-        "OPENAI_DEFAULT_MODEL": "gpt-4o"
-      }
-    }
-  }
-}
-```
-
-Make sure to replace `/path/to/your/compiled/vision-mcp` with the absolute path on your local machine.
-
 ### OpenCode
 
 To use this server with OpenCode, add the server configuration to your OpenCode `config.json` file:
