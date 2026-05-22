@@ -12,7 +12,7 @@ A high-performance, secure **Model Context Protocol (MCP)** server written in Go
 This MCP server is **specifically designed for text-only Large Language Models** that do not natively support image inputs (multimodality). 
 
 > [!NOTE]
-> Native multimodal models (like Claude 3.5 Sonnet, GPT-4o, or Kimi-k2.6) do not need this MCP server because they can already process images directly.
+> Native multimodal models (like Claude Sonnet 4.6, GPT-5.5, or Kimi-K2.6) do not need this MCP server because they can already process images directly.
 > 
 > Instead, this server acts as an **eye for text-only models**: when a text-only model needs to understand a local image, it calls the `describe_image` tool. This server reads the local image, calls an external vision API (such as GPT-4o or Moonshot/Kimi vision model) to get a rich textual description, and feeds that description back to the text-only model, allowing it to reason about the image seamlessly.
 
