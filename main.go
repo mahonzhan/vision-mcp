@@ -280,7 +280,7 @@ func executeDescribeImage(args DescribeImageArgs) ToolCallResponseResult {
 
 	modelID := os.Getenv("OPENAI_DEFAULT_MODEL")
 	if modelID == "" {
-		modelID = "gpt-4o"
+		modelID = "gpt-5.4"
 	}
 
 	logErr("Requesting vision model '%s' via %s...", modelID, baseURL)
