@@ -80,7 +80,8 @@ To use this server with OpenCode, add the server configuration to your OpenCode 
         "OPENAI_API_KEY": "your-actual-api-key-here",
         "OPENAI_DEFAULT_MODEL": "qwen3.6:35b"
       },
-      "enabled": true
+      "enabled": true,
+      "timeout": 300000
     }
   }
 }
