@@ -323,7 +323,7 @@ func executeDescribeImage(args DescribeImageArgs) ToolCallResponseResult {
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
 
 	client := &http.Client{
-		Timeout: 60 * time.Second,
+		Timeout: 300 * time.Second,
 	}
 
 	resp, err := client.Do(httpReq)
