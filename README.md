@@ -52,7 +52,7 @@ To run the server manually in `stdio` mode (mainly for testing, it expects JSON-
 
 ## Configuration
 
-The server is configured entirely using **environment variables**. They can be supplied via your shell, system daemon, or the MCP client configuration file (e.g., Claude Desktop config).
+The server is configured entirely using **environment variables**. They can be supplied via your shell, system daemon, or the MCP client configuration file.
 
 | Environment Variable | Description | Default |
 | :--- | :--- | :--- |
