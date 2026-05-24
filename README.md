@@ -76,9 +76,9 @@ To use this server with OpenCode, add the server configuration to your OpenCode 
       "type": "local",
       "command": ["/home/horsepower/src/vision-mcp/vision-mcp"],
       "environment": {
-        "OPENAI_BASE_URL": "https://api.moonshot.cn/v1",
+        "OPENAI_BASE_URL": "http://127.0.0.1:11434/v1",
         "OPENAI_API_KEY": "your-actual-api-key-here",
-        "OPENAI_DEFAULT_MODEL": "kimi-k2.6"
+        "OPENAI_DEFAULT_MODEL": "qwen3.6:35b"
       },
       "enabled": true
     }
