@@ -52,13 +52,22 @@ To run the server manually in `stdio` mode (mainly for testing, it expects JSON-
 
 ## Configuration
 
-The server is configured entirely using **environment variables**. They can be supplied via your shell, system daemon, or the MCP client configuration file (e.g., Claude Desktop config).
+The server is configured entirely using **environment variables**. They can be supplied via your shell, system daemon, or the MCP client configuration file (e.g., Claude Desktop, OpenCode).
+
+### Provider Priority
+1. **Anthropic** (Priority 1): If `ANTHROPIC_API_KEY` is configured, vision requests will be sent to the Anthropic Messages API (`/v1/messages`).
+2. **OpenAI / Compatible** (Priority 2 / Fallback): If `ANTHROPIC_API_KEY` is not set, vision-mcp falls back to `OPENAI_API_KEY` using the OpenAI Chat Completions API (`/chat/completions`).
 
 | Environment Variable | Description | Default |
 | :--- | :--- | :--- |
-| `OPENAI_API_KEY` | **Required**. Your OpenAI or compatible provider API Key. | None |
-| `OPENAI_BASE_URL` | Base URL of the API endpoint. | `https://api.openai.com/v1` |
-| `OPENAI_DEFAULT_MODEL`| Model ID to use for describing images. | `gpt-4o` |
+| **`ANTHROPIC_API_KEY`** | Anthropic API Key. **Prioritized if set**. | None |
+| `ANTHROPIC_BASE_URL` | Base URL for Anthropic API. | `https://api.anthropic.com/v1` |
+| `ANTHROPIC_DEFAULT_MODEL` | Anthropic model ID to use for vision. | `claude-3-5-sonnet-20241022` |
+| `ANTHROPIC_CUSTOM_HEADERS`| Custom HTTP headers for Anthropic requests (e.g. `X-Organization-Id: 301` or JSON `{"X-Org": "301"}`). | None |
+| **`OPENAI_API_KEY`** | OpenAI or compatible API Key. **Used if Anthropic is not configured**. | None |
+| `OPENAI_BASE_URL` | Base URL for OpenAI compatible endpoint. | `https://api.openai.com/v1` |
+| `OPENAI_DEFAULT_MODEL` | Model ID to use for OpenAI endpoint. | `gpt-4o` |
+| `OPENAI_CUSTOM_HEADERS` | Custom HTTP headers for OpenAI requests. | None |
 
 ---
 
@@ -68,6 +77,27 @@ The server is configured entirely using **environment variables**. They can be s
 
 To use this server with OpenCode, add the server configuration to your OpenCode `config.json` file:
 
+#### Example 1: Using Anthropic (Direct API / Custom Headers)
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "vision-mcp": {
+      "type": "local",
+      "command": ["/home/horsepower/src/vision-mcp/vision-mcp"],
+      "environment": {
+        "ANTHROPIC_API_KEY": "your-anthropic-api-key-here",
+        "ANTHROPIC_BASE_URL": "https://api.anthropic.com/v1",
+        "ANTHROPIC_DEFAULT_MODEL": "claude-3-5-sonnet-20241022",
+        "ANTHROPIC_CUSTOM_HEADERS": "X-Organization-Id: 301"
+      },
+      "enabled": true
+    }
+  }
+}
+```
+
+#### Example 2: Using OpenAI / OpenAI-Compatible Provider (Fallback)
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
@@ -77,7 +107,7 @@ To use this server with OpenCode, add the server configuration to your OpenCode 
       "command": ["/home/horsepower/src/vision-mcp/vision-mcp"],
       "environment": {
         "OPENAI_BASE_URL": "https://api.moonshot.cn/v1",
-        "OPENAI_API_KEY": "your-actual-api-key-here",
+        "OPENAI_API_KEY": "your-openai-or-compatible-api-key-here",
         "OPENAI_DEFAULT_MODEL": "kimi-k2.6"
       },
       "enabled": true
@@ -86,7 +116,7 @@ To use this server with OpenCode, add the server configuration to your OpenCode 
 }
 ```
 
-Make sure to replace the `/home/horsepower/src/vision-mcp/vision-mcp` command path with the absolute path to your compiled binary on your local machine.
+Make sure to replace `/home/horsepower/src/vision-mcp/vision-mcp` with the absolute path to your compiled binary on your local machine.
 
 ---
 

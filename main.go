@@ -99,8 +99,44 @@ type OpenAIResponse struct {
 	} `json:"error"`
 }
 
+// Anthropic API Payload Types
+type AnthropicSource struct {
+	Type      string `json:"type"`
+	MediaType string `json:"media_type"`
+	Data      string `json:"data"`
+}
+
+type AnthropicContent struct {
+	Type   string           `json:"type"`
+	Text   string           `json:"text,omitempty"`
+	Source *AnthropicSource `json:"source,omitempty"`
+}
+
+type AnthropicMessage struct {
+	Role    string             `json:"role"`
+	Content []AnthropicContent `json:"content"`
+}
+
+type AnthropicRequest struct {
+	Model     string             `json:"model"`
+	MaxTokens int                `json:"max_tokens"`
+	Messages  []AnthropicMessage `json:"messages"`
+}
+
+type AnthropicResponse struct {
+	Content []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	} `json:"content"`
+	Error *struct {
+		Type    string `json:"type"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
 var (
-	stdoutMu sync.Mutex
+	stdoutMu  sync.Mutex
+	requestWg sync.WaitGroup
 )
 
 func logErr(format string, args ...any) {
@@ -115,7 +151,7 @@ func main() {
 		line, err := reader.ReadBytes('\n')
 		if err != nil {
 			if err == io.EOF {
-				logErr("Stdin reached EOF. Exiting gracefully.")
+				logErr("Stdin reached EOF. Waiting for in-flight requests...")
 				break
 			}
 			logErr("Error reading stdin: %v", err)
@@ -136,6 +172,9 @@ func main() {
 
 		handleRequest(&req)
 	}
+
+	requestWg.Wait()
+	logErr("Exiting gracefully.")
 }
 
 func handleRequest(req *JSONRPCRequest) {
@@ -194,7 +233,9 @@ func handleRequest(req *JSONRPCRequest) {
 				sendErrorResponse(req.ID, -32602, "Invalid arguments")
 				return
 			}
+			requestWg.Add(1)
 			go func() {
+				defer requestWg.Done()
 				result := executeDescribeImage(args)
 				sendSuccessResponse(req.ID, result)
 			}()
@@ -264,28 +305,170 @@ func executeDescribeImage(args DescribeImageArgs) ToolCallResponseResult {
 
 	// 4. Encode as Base64
 	base64Data := base64.StdEncoding.EncodeToString(fileBytes)
-	dataURL := fmt.Sprintf("data:%s;base64,%s", mimeType, base64Data)
 
-	// 5. Read Configuration from environment variables
+	// 5. Select Provider: Prioritize Anthropic if configured, fallback to OpenAI
+	anthropicKey := os.Getenv("ANTHROPIC_API_KEY")
+	anthropicBaseURL := os.Getenv("ANTHROPIC_BASE_URL")
+	if anthropicBaseURL == "" {
+		anthropicBaseURL = os.Getenv("ANTHROPIC_URL")
+	}
+
+	openAIKey := os.Getenv("OPENAI_API_KEY")
+
+	if anthropicKey != "" || anthropicBaseURL != "" {
+		return callAnthropicVision(anthropicKey, args.Prompt, mimeType, base64Data)
+	} else if openAIKey != "" {
+		return callOpenAIVision(openAIKey, args.Prompt, mimeType, base64Data)
+	} else {
+		return errorToolResult("Neither ANTHROPIC_API_KEY nor OPENAI_API_KEY is configured. Please provide an API key.")
+	}
+}
+
+func callAnthropicVision(apiKey, prompt, mimeType, base64Data string) ToolCallResponseResult {
+	baseURL := os.Getenv("ANTHROPIC_BASE_URL")
+	if baseURL == "" {
+		baseURL = os.Getenv("ANTHROPIC_URL")
+	}
+	if baseURL == "" {
+		baseURL = "https://api.anthropic.com/v1"
+	}
+	baseURL = strings.TrimRight(baseURL, "/")
+
+	modelID := os.Getenv("ANTHROPIC_DEFAULT_MODEL")
+	if modelID == "" {
+		modelID = os.Getenv("ANTHROPIC_MODEL")
+	}
+	if modelID == "" {
+		modelID = "claude-3-5-sonnet-20241022"
+	}
+
+	logErr("Requesting Anthropic vision model '%s' via %s...", modelID, baseURL)
+
+	payload := AnthropicRequest{
+		Model:     modelID,
+		MaxTokens: 1024,
+		Messages: []AnthropicMessage{
+			{
+				Role: "user",
+				Content: []AnthropicContent{
+					{
+						Type: "image",
+						Source: &AnthropicSource{
+							Type:      "base64",
+							MediaType: mimeType,
+							Data:      base64Data,
+						},
+					},
+					{
+						Type: "text",
+						Text: prompt,
+					},
+				},
+			},
+		},
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return errorToolResult(fmt.Sprintf("Failed to construct Anthropic API request: %v", err))
+	}
+
+	var apiURL string
+	if strings.HasSuffix(baseURL, "/messages") {
+		apiURL = baseURL
+	} else if strings.HasSuffix(baseURL, "/v1") {
+		apiURL = baseURL + "/messages"
+	} else {
+		apiURL = baseURL + "/v1/messages"
+	}
+
+	httpReq, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return errorToolResult(fmt.Sprintf("Failed to initialize HTTP client: %v", err))
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	if apiKey != "" {
+		httpReq.Header.Set("x-api-key", apiKey)
+	}
+	httpReq.Header.Set("anthropic-version", "2023-06-01")
+
+	// Apply custom headers if configured (e.g. ANTHROPIC_CUSTOM_HEADERS="X-Organization-Id: 301")
+	applyCustomHeaders(httpReq, os.Getenv("ANTHROPIC_CUSTOM_HEADERS"))
+
+	client := &http.Client{
+		Timeout: 60 * time.Second,
+	}
+
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return errorToolResult(fmt.Sprintf("Failed to call Anthropic vision API: %v", err))
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return errorToolResult(fmt.Sprintf("Failed to read Anthropic API response body: %v", err))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		var anthropicErr AnthropicResponse
+		_ = json.Unmarshal(respBytes, &anthropicErr)
+		errMsg := fmt.Sprintf("Anthropic API returned status %d", resp.StatusCode)
+		if anthropicErr.Error != nil && anthropicErr.Error.Message != "" {
+			errMsg = fmt.Sprintf("Anthropic API Error (%d): %s", resp.StatusCode, anthropicErr.Error.Message)
+		} else {
+			errMsg = fmt.Sprintf("Anthropic API Error (%d): %s", resp.StatusCode, string(respBytes))
+		}
+		return errorToolResult(errMsg)
+	}
+
+	var apiResponse AnthropicResponse
+	if err := json.Unmarshal(respBytes, &apiResponse); err != nil {
+		return errorToolResult(fmt.Sprintf("Failed to parse Anthropic API response: %v", err))
+	}
+
+	var resultTexts []string
+	for _, item := range apiResponse.Content {
+		if item.Type == "text" && item.Text != "" {
+			resultTexts = append(resultTexts, item.Text)
+		}
+	}
+
+	if len(resultTexts) == 0 {
+		return errorToolResult("Anthropic API returned successfully, but returned zero text content")
+	}
+
+	return ToolCallResponseResult{
+		Content: []ToolCallResponseContent{
+			{
+				Type: "text",
+				Text: strings.Join(resultTexts, "\n"),
+			},
+		},
+		IsError: false,
+	}
+}
+
+func callOpenAIVision(apiKey, prompt, mimeType, base64Data string) ToolCallResponseResult {
 	baseURL := os.Getenv("OPENAI_BASE_URL")
 	if baseURL == "" {
 		baseURL = "https://api.openai.com/v1"
 	}
-	baseURL = strings.TrimSuffix(baseURL, "/")
-
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		return errorToolResult("OPENAI_API_KEY environment variable is not configured. Please supply an API key.")
-	}
+	baseURL = strings.TrimRight(baseURL, "/")
 
 	modelID := os.Getenv("OPENAI_DEFAULT_MODEL")
+	if modelID == "" {
+		modelID = os.Getenv("OPENAI_MODEL")
+	}
 	if modelID == "" {
 		modelID = "gpt-4o"
 	}
 
-	logErr("Requesting vision model '%s' via %s...", modelID, baseURL)
+	logErr("Requesting OpenAI vision model '%s' via %s...", modelID, baseURL)
 
-	// 6. Build the payload
+	dataURL := fmt.Sprintf("data:%s;base64,%s", mimeType, base64Data)
+
 	payload := OpenAIRequest{
 		Model: modelID,
 		Messages: []OpenAIRequestMessage{
@@ -294,7 +477,7 @@ func executeDescribeImage(args DescribeImageArgs) ToolCallResponseResult {
 				Content: []OpenAIRequestContent{
 					{
 						Type: "text",
-						Text: args.Prompt,
+						Text: prompt,
 					},
 					{
 						Type: "image_url",
@@ -312,8 +495,13 @@ func executeDescribeImage(args DescribeImageArgs) ToolCallResponseResult {
 		return errorToolResult(fmt.Sprintf("Failed to construct API request: %v", err))
 	}
 
-	// 7. Execute the API request
-	apiURL := fmt.Sprintf("%s/chat/completions", baseURL)
+	var apiURL string
+	if strings.HasSuffix(baseURL, "/chat/completions") {
+		apiURL = baseURL
+	} else {
+		apiURL = fmt.Sprintf("%s/chat/completions", baseURL)
+	}
+
 	httpReq, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		return errorToolResult(fmt.Sprintf("Failed to initialize HTTP client: %v", err))
@@ -321,6 +509,9 @@ func executeDescribeImage(args DescribeImageArgs) ToolCallResponseResult {
 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
+
+	// Apply custom headers if configured
+	applyCustomHeaders(httpReq, os.Getenv("OPENAI_CUSTOM_HEADERS"))
 
 	client := &http.Client{
 		Timeout: 60 * time.Second,
@@ -367,6 +558,49 @@ func executeDescribeImage(args DescribeImageArgs) ToolCallResponseResult {
 			},
 		},
 		IsError: false,
+	}
+}
+
+func applyCustomHeaders(req *http.Request, rawHeaders string) {
+	rawHeaders = strings.TrimSpace(rawHeaders)
+	if rawHeaders == "" {
+		return
+	}
+
+	// 1. Check if rawHeaders is JSON formatted, e.g. {"X-Organization-Id": "301"}
+	if strings.HasPrefix(rawHeaders, "{") && strings.HasSuffix(rawHeaders, "}") {
+		var jsonMap map[string]any
+		if err := json.Unmarshal([]byte(rawHeaders), &jsonMap); err == nil {
+			for k, v := range jsonMap {
+				k = strings.TrimSpace(k)
+				valStr := fmt.Sprintf("%v", v)
+				if k != "" && valStr != "" {
+					req.Header.Set(k, valStr)
+				}
+			}
+			return
+		}
+	}
+
+	// 2. Delimiter-separated format (e.g. newline, comma, semicolon)
+	// Example: "X-Organization-Id: 301" or "X-Org: 301, X-Workspace-Id: 42"
+	lines := strings.FieldsFunc(rawHeaders, func(r rune) bool {
+		return r == '\n' || r == '\r' || r == ',' || r == ';'
+	})
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) == 2 {
+			k := strings.TrimSpace(parts[0])
+			v := strings.TrimSpace(parts[1])
+			if k != "" {
+				req.Header.Set(k, v)
+			}
+		}
 	}
 }
 
