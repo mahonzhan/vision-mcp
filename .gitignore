@@ -1,0 +1,12 @@
+# Binaries
+vision-mcp
+vision-mcp.exe
+dist/
+
+# IDE files
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db

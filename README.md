@@ -3,7 +3,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/yourusername/vision-mcp)](https://goreportcard.com/report/github.com/yourusername/vision-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A high-performance, secure **Model Context Protocol (MCP)** server written in Go that empowers text-only Large Language Models (such as DeepSeek-V3, Qwen-2.5, or text-only Llama models) to "see" and analyze local image files by calling an external OpenAI or OpenAI-compatible Vision Model.
+A high-performance, secure **Model Context Protocol (MCP)** server written in Go that empowers text-only Large Language Models (such as DeepSeek-V4, GLM-5.1 or other text-only models) to "see" and analyze local image files by calling an external OpenAI or OpenAI-compatible Vision Model.
 
 ---
 
@@ -12,9 +12,9 @@ A high-performance, secure **Model Context Protocol (MCP)** server written in Go
 This MCP server is **specifically designed for text-only Large Language Models** that do not natively support image inputs (multimodality). 
 
 > [!NOTE]
-> Native multimodal models (like Claude Sonnet 4.6, GPT-5.5, or Kimi-K2.6) do not need this MCP server because they can already process images directly.
+> Native multimodal models (like Claude Sonnet 4.6, GPT-5.4, or Kimi-K2.6) do not need this MCP server because they can already process images directly.
 > 
-> Instead, this server acts as an **eye for text-only models**: when a text-only model needs to understand a local image, it calls the `describe_image` tool. This server reads the local image, calls an external vision API (such as GPT-4o or Moonshot/Kimi vision model) to get a rich textual description, and feeds that description back to the text-only model, allowing it to reason about the image seamlessly.
+> Instead, this server acts as an **eye for text-only models**: when a text-only model needs to understand a local image, it calls the `describe_image` tool. This server reads the local image, calls an external vision API (such as GPT-5.4 or Moonshot/Kimi vision model) to get a rich textual description, and feeds that description back to the text-only model, allowing it to reason about the image seamlessly.
 
 ---
 
@@ -66,7 +66,7 @@ The server is configured entirely using **environment variables**. They can be s
 | `ANTHROPIC_CUSTOM_HEADERS`| Custom HTTP headers for Anthropic requests (e.g. `X-Organization-Id: 301` or JSON `{"X-Org": "301"}`). | None |
 | **`OPENAI_API_KEY`** | OpenAI or compatible API Key. **Used if Anthropic is not configured**. | None |
 | `OPENAI_BASE_URL` | Base URL for OpenAI compatible endpoint. | `https://api.openai.com/v1` |
-| `OPENAI_DEFAULT_MODEL` | Model ID to use for OpenAI endpoint. | `gpt-4o` |
+| `OPENAI_DEFAULT_MODEL` | Model ID to use for OpenAI endpoint. | `gpt-5.4` |
 | `OPENAI_CUSTOM_HEADERS` | Custom HTTP headers for OpenAI requests. | None |
 
 ---
@@ -75,7 +75,7 @@ The server is configured entirely using **environment variables**. They can be s
 
 ### OpenCode
 
-To use this server with OpenCode, add the server configuration to your OpenCode `config.json` file:
+To use this server with OpenCode, add the server configuration to your OpenCode `config.json` file or project dir `opencode.json`:
 
 #### Example 1: Using Anthropic (Direct API / Custom Headers)
 ```json
@@ -106,11 +106,18 @@ To use this server with OpenCode, add the server configuration to your OpenCode 
       "type": "local",
       "command": ["/home/horsepower/src/vision-mcp/vision-mcp"],
       "environment": {
+<<<<<<< HEAD
         "OPENAI_BASE_URL": "https://api.moonshot.cn/v1",
         "OPENAI_API_KEY": "your-openai-or-compatible-api-key-here",
         "OPENAI_DEFAULT_MODEL": "kimi-k2.6"
+=======
+        "OPENAI_BASE_URL": "http://127.0.0.1:11434/v1",
+        "OPENAI_API_KEY": "your-actual-api-key-here",
+        "OPENAI_DEFAULT_MODEL": "qwen3.6:35b"
+>>>>>>> 8c4eca34d7fdd2341abaf4ed27aaadf99b3bdca5
       },
-      "enabled": true
+      "enabled": true,
+      "timeout": 300000
     }
   }
 }

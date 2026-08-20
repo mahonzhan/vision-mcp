@@ -459,10 +459,7 @@ func callOpenAIVision(apiKey, prompt, mimeType, base64Data string) ToolCallRespo
 
 	modelID := os.Getenv("OPENAI_DEFAULT_MODEL")
 	if modelID == "" {
-		modelID = os.Getenv("OPENAI_MODEL")
-	}
-	if modelID == "" {
-		modelID = "gpt-4o"
+		modelID = "gpt-5.4"
 	}
 
 	logErr("Requesting OpenAI vision model '%s' via %s...", modelID, baseURL)
@@ -514,7 +511,7 @@ func callOpenAIVision(apiKey, prompt, mimeType, base64Data string) ToolCallRespo
 	applyCustomHeaders(httpReq, os.Getenv("OPENAI_CUSTOM_HEADERS"))
 
 	client := &http.Client{
-		Timeout: 60 * time.Second,
+		Timeout: 300 * time.Second,
 	}
 
 	resp, err := client.Do(httpReq)
